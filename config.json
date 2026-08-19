@@ -1,0 +1,28 @@
+{
+  "address": ":8080",
+  "tokens": ["replace-with-a-long-random-token"],
+  "credentials": [{"username": "demo", "password": "replace-with-a-demo-password"}],
+  "cors_origins": ["http://localhost:5173"],
+  "routes": [
+    {
+      "path": "/api/echo",
+      "methods": ["GET", "POST"],
+      "target": { "type": "http", "url": "http://localhost:3001" }
+    },
+    {
+      "path": "/php/status",
+      "methods": ["GET"],
+      "target": { "type": "http", "url": "http://localhost:8081" }
+    },
+    {
+      "path": "/api/v1/demo",
+      "methods": ["GET"],
+      "target": { "type": "http", "url": "http://localhost:8081" }
+    },
+    {
+      "path": "/api/v1/events",
+      "methods": ["POST"],
+      "target": { "type": "http", "url": "http://localhost:8081" }
+    }
+  ]
+}

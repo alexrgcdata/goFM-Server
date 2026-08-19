@@ -1,0 +1,21 @@
+# Go
+bin/
+*.exe
+*.test
+*.out
+
+# Local configuration and secrets
+config.local.json
+.config.private.json
+ALEX/
+.env
+.env.*
+!.env.example
+
+# React tooling
+web/node_modules/
+web/dist/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
