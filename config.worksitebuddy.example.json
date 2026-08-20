@@ -1,0 +1,22 @@
+{
+  "address": "127.0.0.1:8080",
+  "base_path": "/openbridge/api",
+  "tokens": ["REPLACE_WITH_A_LONG_APPLICATION_TOKEN"],
+  "admin_tokens": ["REPLACE_WITH_A_SEPARATE_LONG_ADMIN_TOKEN"],
+  "cors_origins": ["https://worksitebuddy.com", "https://www.worksitebuddy.com"],
+  "logs": {
+    "max_entries": 50,
+    "file": "logs/requests.enc",
+    "encryption_key_env": "GOFM_LOG_KEY",
+    "capture_body_preview": false
+  },
+  "storage": { "db_file": "data/gofm.sqlite" },
+  "routes": [
+    {
+      "id": "replace-with-your-first-route",
+      "path": "/echo",
+      "methods": ["GET", "POST"],
+      "target": { "type": "http", "url": "https://YOUR-UPSTREAM.example.com" }
+    }
+  ]
+}

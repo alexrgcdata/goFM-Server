@@ -1,0 +1,83 @@
+import { useMemo, useState } from 'react'
+
+function joinUrl(base, path) { return `${base.trim().replace(/\/+$/, '')}/${path.trim().replace(/^\/+/, '')}` }
+async function readResponse(response) {
+  const text = await response.text()
+  let body = text
+  try { body = text ? JSON.parse(text) : null } catch {}
+  return { body, headers: Object.fromEntries(response.headers.entries()), status: response.status, ok: response.ok }
+}
+
+function Icon({ name, size = 18 }) {
+  const paths = {
+    activity: <path d="M3 12h4l2-8 4 16 2-8h6" />, arrow: <><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></>,
+    bolt: <path d="m13 2-9 12h7l-1 8 9-12h-7z" />, check: <path d="m5 12 4 4L19 6" />, lock: <><rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>,
+    server: <><rect x="3" y="4" width="18" height="6" rx="2" /><rect x="3" y="14" width="18" height="6" rx="2" /><path d="M7 7h.01M7 17h.01" /></>,
+    code: <><path d="m8 9-3 3 3 3M16 9l3 3-3 3M14 5l-4 14" /></>, plus: <><path d="M12 5v14M5 12h14" /></>, copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>, refresh: <><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4" /></>, database: <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" /></>, settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 1.6-1.7v-2.6A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0-.3-1.9l-.2-.2-1.8-1.8-.2.2a1.7 1.7 0 0 0-1.9-.3A1.7 1.7 0 0 0 14 3.4V3h-4v.4a1.7 1.7 0 0 0-1 1.6 1.7 1.7 0 0 0-1.8.3L7 5.1 5.1 7l.2.2A1.7 1.7 0 0 0 5 9a1.7 1.7 0 0 0-1.4 1.7v2.6A1.7 1.7 0 0 0 5 15a1.7 1.7 0 0 0 .3 1.9l-.2.2L7 18.9l.2-.2a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1 1.6v.4h4v-.4a1.7 1.7 0 0 0 1-1.6 1.7 1.7 0 0 0 1.9-.3l.2.2 1.8-1.8-.2-.2a1.7 1.7 0 0 0 .3-1.9Z" /></>
+  }
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
+}
+
+function snippetFor(type, operation) {
+  const url = type === 'data_api' ? 'https://YOUR-FM-HOST/fmi/data/vLatest/databases/YOUR_DB/layouts/YOUR_LAYOUT' : 'https://YOUR-FM-HOST/odata/v4/YOUR_COLLECTION'
+  const auth = type === 'data_api' ? 'Bearer YOUR_FILEMAKER_DATA_API_TOKEN' : 'Bearer YOUR_ODATA_TOKEN'
+  const actions = {
+    data_api: {
+      find: `// Find records through the goFM gateway\nconst response = await fetch('/api/filemaker/find', {\n  method: 'POST',\n  headers: { 'Authorization': 'Bearer YOUR_GOFM_TOKEN', 'Content-Type': 'application/json' },\n  body: JSON.stringify({ layout: 'Customers', query: [{ field: 'Status', op: 'eq', value: 'Active' }] })\n});\nconst data = await response.json(); // normalized records + pagination`,
+      get: `// Get one FileMaker record\nconst response = await fetch('/api/filemaker/record/RECORD_ID', {\n  headers: { 'Authorization': 'Bearer YOUR_GOFM_TOKEN' }\n});\nconst data = await response.json();`,
+      create: `// Demo create payload; enable mutations server-side before using\nconst response = await fetch('/api/filemaker/record', {\n  method: 'POST',\n  headers: { 'Authorization': 'Bearer YOUR_GOFM_TOKEN', 'Content-Type': 'application/json' },\n  body: JSON.stringify({ layout: 'Customers', fields: { Name: 'Demo customer' } })\n});\nconst data = await response.json();`
+    },
+    odata: {
+      find: `// List OData records through the goFM gateway\nconst response = await fetch('/api/odata/customers?status=Active', {\n  headers: { 'Authorization': 'Bearer YOUR_GOFM_TOKEN' }\n});\nconst data = await response.json(); // normalized records + pagination`,
+      get: `// Get one OData record\nconst response = await fetch('/api/odata/customers/RECORD_ID', {\n  headers: { 'Authorization': 'Bearer YOUR_GOFM_TOKEN' }\n});\nconst data = await response.json();`,
+      create: `// Demo create payload; enable mutations server-side before using\nconst response = await fetch('/api/odata/customers', {\n  method: 'POST',\n  headers: { 'Authorization': 'Bearer YOUR_GOFM_TOKEN', 'Content-Type': 'application/json' },\n  body: JSON.stringify({ Name: 'Demo customer' })\n});\nconst data = await response.json();`
+    }
+  }
+  return `// Connection reference for later adapter setup: ${url}\n// Upstream auth stays server-side: ${auth}\n\n${actions[type][operation]}`
+}
+
+export default function App() {
+  const defaultGatewayURL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8080' : `${window.location.origin}/openbridge/api`)
+  const [baseUrl, setBaseUrl] = useState(defaultGatewayURL)
+  const [token, setToken] = useState(''); const [endpoint, setEndpoint] = useState('/echo'); const [method, setMethod] = useState('GET')
+  const [result, setResult] = useState(null); const [loading, setLoading] = useState(false); const [activeNav, setActiveNav] = useState('Overview')
+  const [telemetry, setTelemetry] = useState({ overview: null, routes: [], logs: [] })
+  const [bridgeType, setBridgeType] = useState('data_api'); const [snippet, setSnippet] = useState(snippetFor('data_api', 'find'))
+  const [draftRoute, setDraftRoute] = useState({ id: 'new-route', path: '/new-route', method: 'GET', target: 'http://127.0.0.1:3001', auth: true }); const [draftRoutes, setDraftRoutes] = useState([])
+  const apiOrigin = useMemo(() => { try { return new URL(baseUrl).origin } catch { return 'Not configured' } }, [baseUrl])
+
+  async function request(path, needsAuth, requestMethod = 'GET') {
+    if (!baseUrl.trim()) { setResult({ error: 'Enter the API base URL first.' }); return }
+    setLoading(true); setResult(null); const url = joinUrl(baseUrl, path); const headers = { Accept: 'application/json' }
+    if (needsAuth && token.trim()) headers.Authorization = `Bearer ${token.trim()}`
+    try { const response = await fetch(url, { method: requestMethod, headers }); const inspected = await readResponse(response); setResult({ url, ...inspected, authVerified: response.headers.get('X-GoFM-Auth-Verified') === 'true' }) } catch (error) { setResult({ url, error: error.message }) } finally { setLoading(false) }
+  }
+  async function refreshTelemetry() {
+    if (!baseUrl.trim() || !token.trim()) { setResult({ error: 'Enter the admin bearer token to load routes and logs.' }); return }
+    setLoading(true); const headers = { Accept: 'application/json', Authorization: `Bearer ${token.trim()}` }
+    try { const [overview, routes, logs] = await Promise.all(['/__gofm/overview', '/__gofm/routes', '/__gofm/logs'].map(path => fetch(joinUrl(baseUrl, path), { headers }).then(readResponse))); setTelemetry({ overview: overview.body, routes: routes.body?.routes || [], logs: logs.body?.logs || [] }) } catch (error) { setResult({ error: error.message }) } finally { setLoading(false) }
+  }
+  async function checkHealth() { await request('/health', false); await refreshTelemetry() }
+  async function addDraftRoute() {
+    if (!token.trim()) { setResult({ error: 'Enter the admin bearer token before adding a route.' }); return }
+    setLoading(true)
+    try {
+      const response = await fetch(joinUrl(baseUrl, '/__gofm/routes'), { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${token.trim()}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: draftRoute.id, path: draftRoute.path, methods: [draftRoute.method], target: { type: 'http', url: draftRoute.target }, hooks: { before: 'fireGoHookBefore', after: 'fireGoHookAfter' } }) })
+      const inspected = await readResponse(response)
+      if (!response.ok) { setResult({ status: response.status, ...inspected }); return }
+      setDraftRoutes(current => [...current, inspected.body.route]); setDraftRoute({ id: `route-${draftRoutes.length + 2}`, path: '/new-route', method: 'GET', target: 'http://127.0.0.1:3001', auth: true }); await refreshTelemetry()
+    } catch (error) { setResult({ error: error.message }) } finally { setLoading(false) }
+  }
+  function chooseSnippet(operation) { setSnippet(snippetFor(bridgeType, operation)) }
+  async function copySnippet() { await navigator.clipboard?.writeText(snippet) }
+  const navItems = [['Overview', 'activity'], ['Request console', 'arrow'], ['Coding help', 'code'], ['Routes', 'server']]
+  return <div className="app-shell"><aside className="sidebar"><div className="brand"><span className="brand-mark"><Icon name="bolt" size={17} /></span><span>goFM <small>OPENBRIDGE</small></span></div><div className="workspace"><span className="workspace-dot" /> Local workspace <span className="chevron">⌄</span></div><p className="nav-label">Workspace</p><nav>{navItems.map(([item, icon]) => <button key={item} className={activeNav === item ? 'nav-item active' : 'nav-item'} onClick={() => setActiveNav(item)}><Icon name={icon} size={17} />{item}</button>)}</nav><div className="sidebar-bottom"><button className="nav-item"><Icon name="settings" size={17} />Settings</button><div className="profile"><div className="avatar">A</div><div><strong>Alex Seidler</strong><span>agseidler@gmail.com</span></div></div></div></aside>
+    <main className="content"><header className="topbar"><div><span className="breadcrumb">OpenBridge / </span><strong>{activeNav}</strong></div><div className="top-actions"><span className="secure"><span className="pulse" /> Server online</span><button className="icon-button" aria-label="Settings"><Icon name="settings" size={18} /></button></div></header>
+      <div className="page-heading"><div><p className="eyebrow">FileMaker to web gateway</p><h1>{activeNav === 'Overview' ? 'Good evening, Alex.' : activeNav}</h1><p className="muted">Route, inspect, and learn your integrations from one secure control surface.</p></div><button className="primary-button" onClick={checkHealth} disabled={loading}><Icon name="activity" size={16} /> {loading ? 'Checking…' : 'Check health'}</button></div>
+      <section className="stats-grid"><article className="stat-card accent"><div className="stat-top"><span>Gateway status</span><span className="status-badge"><span className="pulse" /> Healthy</span></div><strong>Operational</strong><small>{apiOrigin}</small><div className="sparkline">{[8,13,10,17,14,20,17,22,20].map((height, i) => <i key={i} style={{ height }} />)}</div></article><article className="stat-card"><div className="stat-top"><span>Active routes</span><span className="stat-icon"><Icon name="server" size={16} /></span></div><strong>{telemetry.overview?.route_count ?? 2}</strong><small>Configured fixed targets</small></article><article className="stat-card"><div className="stat-top"><span>Persistent storage</span><span className="stat-icon purple"><Icon name="database" size={16} /></span></div><strong>{telemetry.overview?.persistent_storage ? 'Ready' : 'Demo'}</strong><small>SQLite request history</small></article></section>
+      <div className="dashboard-grid"><section className="panel request-panel"><div className="panel-heading"><div><p className="eyebrow">Live tools</p><h2>Request console</h2></div><span className="method-chip">Bearer auth ready</span></div><p className="panel-copy">Send a request through your Go gateway and inspect the upstream response.</p><div className="request-line"><select value={method} onChange={e => setMethod(e.target.value)} aria-label="HTTP method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select><input value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="/api/echo" aria-label="API endpoint" /><button className="send-button" onClick={() => request(endpoint, true, method)} disabled={loading}><Icon name="arrow" size={16} /> Send</button></div><label className="field-label">Gateway URL<input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="http://localhost:8080" inputMode="url" /></label><label className="field-label">Bearer token <span>kept in browser memory</span><input value={token} onChange={e => setToken(e.target.value)} placeholder="Paste a development token" type="password" autoComplete="off" /></label><div className="auth-confirmation">{result?.authVerified ? <><Icon name="check" size={16} /> Go verified the bearer token for this request.</> : 'Your real token is never echoed back; successful authentication is confirmed here.'}</div><div className="response-box"><div className="response-header"><span><span className="response-dot" /> Response</span>{result && <span>{result.status ? `${result.status} ${result.ok ? 'OK' : 'Error'}` : 'Network error'}</span>}</div><pre>{result ? JSON.stringify(result, null, 2) : 'Run a request to see the response payload here.'}</pre></div></section><section className="panel security-panel"><div className="panel-heading"><div><p className="eyebrow">Observability</p><h2>Recent requests</h2></div><button className="refresh-button" onClick={refreshTelemetry} disabled={loading}><Icon name="refresh" size={16} /> Refresh logs</button></div><p className="panel-copy">Server metadata only. Tokens, cookies, and credentials stay out of the viewer.</p>{telemetry.logs.length ? <div className="log-list">{telemetry.logs.slice(0, 8).map(log => <div className="log-row" key={log.id}><span className={`log-status ${log.status >= 400 ? 'bad' : 'good'}`}>{log.status}</span><span className="log-main"><strong>{log.method} {log.path}</strong><small>{log.id} · {log.duration_ms}ms · {log.outcome}{log.hook_after_requested ? ' · after hook requested' : ''}</small></span><span className="log-time">{new Date(log.started_at).toLocaleTimeString()}</span></div>)}</div> : <div className="empty-log">Enter the admin token and refresh to load request history.</div>}</section></div>
+      <section className="panel bridge-panel"><div className="panel-heading"><div><p className="eyebrow">OpenBridge coding help</p><h2>Copy a starter function</h2></div><span className="method-chip">Demo only</span></div><p className="panel-copy">Choose a transport, then inject a commented fetch example into the code window. Replace the dummy values before using it.</p><div className="tab-row"><button className={bridgeType === 'data_api' ? 'tab active' : 'tab'} onClick={() => { setBridgeType('data_api'); setSnippet(snippetFor('data_api', 'find')) }}>Data API</button><button className={bridgeType === 'odata' ? 'tab active' : 'tab'} onClick={() => { setBridgeType('odata'); setSnippet(snippetFor('odata', 'find')) }}>OData</button></div><div className="snippet-actions"><button onClick={() => chooseSnippet('find')}>Find records</button><button onClick={() => chooseSnippet('get')}>Get record</button><button onClick={() => chooseSnippet('create')}>Create record</button><button className="copy-button" onClick={copySnippet}><Icon name="copy" size={15} /> Copy code</button></div><textarea className="code-window" value={snippet} onChange={e => setSnippet(e.target.value)} spellCheck="false" /></section>
+      <section className="panel routes-panel"><div className="panel-heading"><div><p className="eyebrow">Route builder</p><h2>Add a protected route</h2></div><span className="method-chip">Runtime admin</span></div><p className="panel-copy">Add a validated protected route to the running Go server. It is active immediately; save the reviewed JSON into config.json before restarting the server.</p><div className="route-builder"><input value={draftRoute.id} onChange={e => setDraftRoute({ ...draftRoute, id: e.target.value })} aria-label="Route ID" placeholder="route-id" /><input value={draftRoute.path} onChange={e => setDraftRoute({ ...draftRoute, path: e.target.value })} aria-label="Route path" placeholder="/example" /><select value={draftRoute.method} onChange={e => setDraftRoute({ ...draftRoute, method: e.target.value })} aria-label="Route method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select><input value={draftRoute.target} onChange={e => setDraftRoute({ ...draftRoute, target: e.target.value })} aria-label="Target URL" placeholder="http://127.0.0.1:3001" /><button className="primary-button" onClick={addDraftRoute}><Icon name="plus" size={15} /> Add route</button></div>{draftRoutes.length > 0 && <pre className="route-preview">{JSON.stringify(draftRoutes.map(route => ({ id: route.id, path: route.path, methods: route.methods || [route.method], target: route.target?.url ? route.target : { type: 'http', url: route.target }, hooks: route.hooks || { before: 'fireGoHookBefore', after: 'fireGoHookAfter' } })), null, 2)}</pre>}</section>
+      <footer className="footer">OpenBridge · Alex Seidler · <a href="mailto:agseidler@gmail.com">agseidler@gmail.com</a></footer>
+    </main></div>
+}

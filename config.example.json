@@ -1,0 +1,33 @@
+{
+  "address": ":8080",
+  "tokens": ["replace-with-a-long-random-token"],
+  "admin_tokens": ["replace-with-a-long-admin-token"],
+  "cors_origins": ["http://localhost:5173"],
+  "logs": {
+    "max_entries": 50,
+    "capture_body_preview": false
+  },
+  "storage": {
+    "db_file": "data/gofm.sqlite"
+  },
+  "routes": [
+    {
+      "id": "echo",
+      "path": "/api/echo",
+      "methods": ["GET", "POST"],
+      "target": { "type": "http", "url": "http://localhost:3001" }
+    },
+    {
+      "id": "inventory",
+      "path": "/api/inventory",
+      "methods": ["GET"],
+      "target": { "type": "http", "url": "http://localhost:3002" }
+    },
+    {
+      "id": "failure-demo",
+      "path": "/api/failure",
+      "methods": ["GET"],
+      "target": { "type": "http", "url": "http://localhost:3999" }
+    }
+  ]
+}
