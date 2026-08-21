@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from 'react'
 
 const NAV = [['Overview', 'home'], ['Routes', 'route'], ['Metrics', 'chart'], ['Logs', 'logs'], ['Settings', 'settings']]
@@ -106,3 +107,94 @@ function Logs({logs,settings,logLimit,setLogLimit,saveSettings,selectedLog,setSe
 function Settings({baseUrl,setBaseUrl,token,setToken,showToken,setShowToken,connect,connected,overview,draftToken,generateToken}){return <div className="settings-grid"><section className="panel settings-card"><div className="panel-heading"><div><p className="eyebrow">Admin connection</p><h2>Connect this dashboard</h2></div><StatusPill good={connected}>{connected?'Connected':'Not connected'}</StatusPill></div><p className="panel-intro">This token manages routes, credentials, logs, and metrics. It is held only in this browser tab.</p><Field label="Go middleware URL" full><input type="url" value={baseUrl} onChange={e=>setBaseUrl(e.target.value)} placeholder="https://example.com/openbridge/go/api"/></Field><Field label="Administrator token" full><div className="password-input"><input type={showToken?'text':'password'} value={token} onChange={e=>setToken(e.target.value)} placeholder="Paste GOFM_ADMIN_TOKEN" autoComplete="off"/><button type="button" onClick={()=>setShowToken(!showToken)} aria-label="Show or hide token"><Icon name="eye" size={18}/></button></div></Field><Button className="wide" onClick={connect}><Icon name="lock" size={17}/>Connect securely</Button></section><section className="panel settings-card"><div className="panel-heading"><div><p className="eyebrow">Deployment tokens</p><h2>Generate a secure token</h2></div><span className="soft-icon"><Icon name="lock"/></span></div><p className="panel-intro">Generate a strong draft, then place it in your hosting environment as <code>GOFM_APP_TOKEN</code> or <code>GOFM_ADMIN_TOKEN</code>. Generating it here does not activate it.</p><Button variant="secondary" onClick={generateToken}>Generate 256-bit token</Button>{draftToken&&<div className="generated-token"><code>{draftToken}</code><button onClick={()=>navigator.clipboard?.writeText(draftToken)}><Icon name="copy" size={16}/>Copy</button></div>}<div className="token-rule"><Icon name="lock" size={17}/><span><strong>Keep two different tokens</strong><small>Application tokens call routes. Administrator tokens change configuration.</small></span></div></section><section className="panel security-summary"><div className="panel-heading"><div><p className="eyebrow">Security posture</p><h2>Server protections</h2></div></div><div className="security-grid"><SecurityItem label="Credential vault" ready={overview?.credential_vault} text="AES-256-GCM encrypted credentials"/><SecurityItem label="Encrypted logs" ready={overview?.logs_encrypted} text="Bounded encrypted request history"/><SecurityItem label="SQLite storage" ready={overview?.persistent_storage} text="Server-side transaction database"/><SecurityItem label="Fixed destinations" ready text="No caller-provided upstream URLs"/></div></section></div>}
 function SecurityItem({label,ready,text}){return <div className="security-item"><span className={ready?'ready':''}><Icon name={ready?'check':'lock'} size={16}/></span><div><strong>{label}</strong><small>{text}</small></div><b>{ready?'Ready':'Setup needed'}</b></div>}
 function ConnectionRequired({onSettings}){return <section className="panel connection-required"><span><Icon name="lock" size={28}/></span><h2>Connect the administrator panel</h2><p>Enter your Go administrator token once to manage this private server. FileMaker credentials use a separate encrypted vault.</p><Button onClick={onSettings}>Open secure settings</Button></section>}
+=======
+import { useState } from 'react'
+
+function joinUrl(baseUrl, path) {
+  const normalizedBase = baseUrl.trim().replace(/\/+$/, '')
+  const normalizedPath = path.trim().replace(/^\/+/, '')
+  return `${normalizedBase}/${normalizedPath}`
+}
+
+async function readResponse(response) {
+  const body = await response.text()
+  if (!body) return null
+
+  try {
+    return JSON.parse(body)
+  } catch {
+    return body
+  }
+}
+
+export default function App() {
+  const [baseUrl, setBaseUrl] = useState(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080')
+  const [token, setToken] = useState('')
+  const [endpoint, setEndpoint] = useState('/api/example')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  async function request(path, needsAuth) {
+    if (!baseUrl.trim()) {
+      setResult({ error: 'Enter the API base URL first.' })
+      return
+    }
+
+    setLoading(true)
+    setResult(null)
+    const url = joinUrl(baseUrl, path)
+    const headers = { Accept: 'application/json' }
+    if (needsAuth && token.trim()) headers.Authorization = `Bearer ${token.trim()}`
+
+    try {
+      const response = await fetch(url, { headers })
+      setResult({
+        url,
+        status: response.status,
+        ok: response.ok,
+        body: await readResponse(response),
+      })
+    } catch (error) {
+      setResult({ url, error: error.message })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <main>
+      <section className="card" aria-labelledby="title">
+        <p className="eyebrow">Example React client</p>
+        <h1 id="title">goFM Server</h1>
+        <p className="intro">Use this small client to check the server health endpoint or make a bearer-token API request.</p>
+        <p className="cors-note">
+          Browser origin: <code>{window.location.origin}</code>. Add this exact origin to the server's allowed CORS origins before calling an API on another origin.
+        </p>
+
+        <label>
+          API base URL
+          <input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="http://localhost:8080" inputMode="url" />
+        </label>
+        <label>
+          Bearer token <span>(only sent with the API request)</span>
+          <input value={token} onChange={(event) => setToken(event.target.value)} placeholder="development token" type="password" autoComplete="off" />
+        </label>
+        <label>
+          API endpoint
+          <input value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="/api/example" />
+        </label>
+
+        <div className="actions">
+          <button type="button" onClick={() => request('/health', false)} disabled={loading}>Check health</button>
+          <button type="button" className="primary" onClick={() => request(endpoint, true)} disabled={loading}>Call API endpoint</button>
+        </div>
+
+        <section className="result" aria-live="polite" aria-label="Response">
+          <h2>Response</h2>
+          <pre>{result ? JSON.stringify(result, null, 2) : 'No request sent yet.'}</pre>
+        </section>
+      </section>
+    </main>
+  )
+}
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6

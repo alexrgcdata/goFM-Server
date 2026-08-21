@@ -1,18 +1,25 @@
 package server
 
 import (
+<<<<<<< HEAD
 	"encoding/base64"
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
 	"strings"
+<<<<<<< HEAD
 
 	"gofm-server/internal/filemaker"
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 )
 
 // Config describes the server's listener, accepted bearer tokens, and routes.
 type Config struct {
+<<<<<<< HEAD
 	Address              string             `json:"address"`
 	BasePath             string             `json:"base_path,omitempty"`
 	Tokens               []string           `json:"tokens,omitempty"`
@@ -68,6 +75,26 @@ type Route struct {
 type HookConfig struct {
 	Before string `json:"before,omitempty"`
 	After  string `json:"after,omitempty"`
+=======
+	Address     string       `json:"address"`
+	Tokens      []string     `json:"tokens"`
+	Credentials []Credential `json:"credentials"`
+	CORSOrigins []string     `json:"cors_origins"`
+	Routes      []Route      `json:"routes"`
+}
+
+// Credential is a development login accepted by POST /auth/token.
+// Production deployments should replace this with an identity provider.
+type Credential struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type Route struct {
+	Path    string   `json:"path"`
+	Methods []string `json:"methods"`
+	Target  Target   `json:"target"`
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 }
 
 type Target struct {
@@ -94,6 +121,7 @@ func (c *Config) Validate() error {
 	if c.Address == "" {
 		c.Address = ":8080"
 	}
+<<<<<<< HEAD
 	if c.BasePath != "" {
 		c.BasePath = "/" + strings.Trim(c.BasePath, "/")
 		if c.BasePath == "/" {
@@ -114,12 +142,15 @@ func (c *Config) Validate() error {
 		}
 		c.AdminTokens = append(c.AdminTokens, token)
 	}
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	for i := range c.Tokens {
 		c.Tokens[i] = strings.TrimSpace(c.Tokens[i])
 		if c.Tokens[i] == "" {
 			return fmt.Errorf("tokens[%d] is empty", i)
 		}
 	}
+<<<<<<< HEAD
 	for i := range c.AdminTokens {
 		c.AdminTokens[i] = strings.TrimSpace(c.AdminTokens[i])
 		if c.AdminTokens[i] == "" {
@@ -186,6 +217,14 @@ func (c *Config) Validate() error {
 	if c.Logs.MaxEntries < 1 || c.Logs.MaxEntries > 10000 {
 		return fmt.Errorf("logs.max_entries must be between 1 and 10000")
 	}
+=======
+	for i := range c.Credentials {
+		c.Credentials[i].Username = strings.TrimSpace(c.Credentials[i].Username)
+		if c.Credentials[i].Username == "" || c.Credentials[i].Password == "" {
+			return fmt.Errorf("credentials[%d] requires username and password", i)
+		}
+	}
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	for i := range c.CORSOrigins {
 		origin := strings.TrimSpace(c.CORSOrigins[i])
 		parsed, err := url.Parse(origin)
@@ -195,6 +234,7 @@ func (c *Config) Validate() error {
 		c.CORSOrigins[i] = origin
 	}
 	seen := make(map[string]struct{})
+<<<<<<< HEAD
 	connections := make(map[string]struct{})
 	for i := range c.FileMakerConnections {
 		connection := &c.FileMakerConnections[i]
@@ -223,6 +263,9 @@ func (c *Config) Validate() error {
 		if route.Auth != "application" && route.Auth != "admin" {
 			return fmt.Errorf("routes[%d].auth must be application or admin", i)
 		}
+=======
+	for i, route := range c.Routes {
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 		if !strings.HasPrefix(route.Path, "/") || route.Path == "/" {
 			return fmt.Errorf("routes[%d].path must be a non-root path beginning with /", i)
 		}
@@ -250,6 +293,7 @@ func (c *Config) Validate() error {
 	}
 	return nil
 }
+<<<<<<< HEAD
 
 func validateEncryptionKey(environment string) error {
 	encoded := strings.TrimSpace(os.Getenv(environment))
@@ -259,3 +303,5 @@ func validateEncryptionKey(environment string) error {
 	}
 	return nil
 }
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6

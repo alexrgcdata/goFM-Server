@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "address": "127.0.0.1:8080",
   "token_env": "GOFM_APP_TOKEN",
   "admin_token_env": "GOFM_ADMIN_TOKEN",
@@ -44,6 +45,24 @@
       "methods": ["GET"],
       "auth": "application",
       "target": { "type": "http", "url": "http://127.0.0.1:3999" }
+=======
+  "address": ":8080",
+  "tokens": [],
+  "credentials": [
+    { "username": "demo", "password": "replace-with-a-long-random-password" }
+  ],
+  "cors_origins": ["http://localhost:5173"],
+  "routes": [
+    {
+      "path": "/api/v1/demo",
+      "methods": ["GET"],
+      "target": { "type": "http", "url": "http://127.0.0.1:8081" }
+    },
+    {
+      "path": "/api/v1/events",
+      "methods": ["POST"],
+      "target": { "type": "http", "url": "http://127.0.0.1:8081" }
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
     }
   ]
 }

@@ -5,10 +5,16 @@ bin/
 *.out
 
 # Local configuration and secrets
+<<<<<<< HEAD
 config.json
 config.local.json
 data/
 logs/
+=======
+config.local.json
+.config.private.json
+ALEX/
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 .env
 .env.*
 !.env.example

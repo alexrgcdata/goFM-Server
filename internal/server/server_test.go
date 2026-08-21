@@ -1,16 +1,23 @@
 package server
 
 import (
+<<<<<<< HEAD
 	"context"
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	"encoding/json"
 	"io"
 	"net"
 	"net/http"
+<<<<<<< HEAD
 	"path/filepath"
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	"strings"
 	"testing"
 )
 
+<<<<<<< HEAD
 func TestSQLiteStoresMetadataWithoutResponsePreview(t *testing.T) {
 	server := New(Config{Tokens: []string{"app"}, AdminTokens: []string{"admin"}, Logs: LogConfig{MaxEntries: 10, CaptureBodyPreview: true}, Storage: StorageConfig{DBFile: filepath.Join(t.TempDir(), "gofm.sqlite")}})
 	defer server.store.Close()
@@ -27,6 +34,8 @@ func TestSQLiteStoresMetadataWithoutResponsePreview(t *testing.T) {
 	}
 }
 
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 type responseRecorder struct {
 	header http.Header
 	body   strings.Builder
@@ -67,6 +76,7 @@ func TestHealthIsPublic(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 func TestConfiguredBasePathKeepsGatewaySecondary(t *testing.T) {
 	server := New(Config{
 		BasePath: "/openbridge/api",
@@ -96,6 +106,8 @@ func TestConfiguredBasePathKeepsGatewaySecondary(t *testing.T) {
 	}
 }
 
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 func TestProtectedRouteRequiresBearerToken(t *testing.T) {
 	response := newRecorder()
 	testServer("http://example.invalid").ServeHTTP(response, newRequest(t, http.MethodGet, "/api/echo", nil))
@@ -104,6 +116,7 @@ func TestProtectedRouteRequiresBearerToken(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 func TestRequestBodyLimitIsEnforced(t *testing.T) {
 	server := testServer("http://example.invalid")
 	server.config.Security.MaxRequestBodyBytes = 1024
@@ -142,6 +155,29 @@ func TestAdminAuthorizedRouteRejectsApplicationToken(t *testing.T) {
 	server.ServeHTTP(response, request)
 	if response.status != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", response.status)
+=======
+func TestTokenEndpointIssuesTokenForConfiguredCredential(t *testing.T) {
+	server := New(Config{Credentials: []Credential{{Username: "demo", Password: "secret"}}, Routes: []Route{{Path: "/api/echo", Methods: []string{"GET"}, Target: Target{Type: "http", URL: "http://127.0.0.1:1"}}}})
+	request := newRequest(t, http.MethodPost, "/auth/token", strings.NewReader(`{"username":"demo","password":"secret"}`))
+	response := newRecorder()
+	server.ServeHTTP(response, request)
+	if response.status != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.status)
+	}
+	var body struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+	}
+	if err := json.NewDecoder(strings.NewReader(response.body.String())).Decode(&body); err != nil || body.AccessToken == "" || body.TokenType != "Bearer" {
+		t.Fatalf("unexpected token response: %#v, %v", body, err)
+	}
+	protected := newRecorder()
+	protectedRequest := newRequest(t, http.MethodGet, "/api/echo", nil)
+	protectedRequest.Header.Set("Authorization", "Bearer "+body.AccessToken)
+	server.ServeHTTP(protected, protectedRequest)
+	if protected.status != http.StatusBadGateway {
+		t.Fatalf("issued token was not accepted; status = %d", protected.status)
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	}
 }
 

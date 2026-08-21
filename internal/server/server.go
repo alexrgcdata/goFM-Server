@@ -1,15 +1,24 @@
 package server
 
 import (
+<<<<<<< HEAD
 	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"log"
+=======
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
+<<<<<<< HEAD
 	"time"
 
 	"gofm-server/internal/credentials"
@@ -132,6 +141,22 @@ func (s *Server) recordRequest(recorder *captureWriter, request, original *http.
 }
 
 func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
+=======
+)
+
+type Server struct {
+	config       Config
+	client       *http.Client
+	tokensMu     sync.RWMutex
+	issuedTokens map[string]struct{}
+}
+
+func New(config Config) *Server {
+	return &Server{config: config, client: http.DefaultClient, issuedTokens: make(map[string]struct{})}
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	origin := r.Header.Get("Origin")
 	if s.allowedOrigin(origin) {
 		setCORSHeaders(w.Header(), origin)
@@ -140,10 +165,13 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		s.handlePreflight(w, r, origin)
 		return
 	}
+<<<<<<< HEAD
 	if strings.HasPrefix(r.URL.Path, "/__gofm/") {
 		s.handleAdmin(w, r)
 		return
 	}
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	if r.URL.Path == "/health" {
 		if r.Method != http.MethodGet {
 			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "only GET is allowed")
@@ -152,24 +180,41 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
+<<<<<<< HEAD
 	if r.URL.Path == "/api/filemaker/execute" {
 		s.handleFileMaker(w, r)
 		return
 	}
+=======
+	if r.URL.Path == "/auth/token" {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "only POST is allowed")
+			return
+		}
+		s.issueToken(w, r)
+		return
+	}
+
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	route := s.match(r.Method, r.URL.Path)
 	if route == nil {
 		writeError(w, http.StatusNotFound, "route_not_found", "no route matches this method and path")
 		return
 	}
+<<<<<<< HEAD
 	tokens := s.config.Tokens
 	if route.Auth == "admin" {
 		tokens = s.config.AdminTokens
 	}
 	if len(tokens) == 0 || !s.authorized(r.Header.Get("Authorization"), tokens) {
+=======
+	if len(s.config.Tokens) > 0 && !s.authorized(r.Header.Get("Authorization")) {
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 		w.Header().Set("WWW-Authenticate", "Bearer")
 		writeError(w, http.StatusUnauthorized, "unauthorized", "a valid bearer token is required")
 		return
 	}
+<<<<<<< HEAD
 	w.Header().Set("X-GoFM-Auth-Verified", "true")
 	s.dispatchHTTP(w, r, route.Target.URL)
 }
@@ -405,6 +450,11 @@ func safeTarget(raw string) string {
 	return target.Scheme + "://" + target.Host + target.Path
 }
 
+=======
+	s.dispatchHTTP(w, r, route.Target.URL)
+}
+
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 func (s *Server) allowedOrigin(origin string) bool {
 	for _, allowed := range s.config.CORSOrigins {
 		if origin == allowed {
@@ -420,6 +470,7 @@ func (s *Server) handlePreflight(w http.ResponseWriter, r *http.Request, origin 
 		return
 	}
 	route := s.match(r.Header.Get("Access-Control-Request-Method"), r.URL.Path)
+<<<<<<< HEAD
 	if r.URL.Path != "/health" && r.URL.Path != "/api/filemaker/execute" && !strings.HasPrefix(r.URL.Path, "/__gofm/") && route == nil {
 		writeError(w, http.StatusNotFound, "route_not_found", "no route matches this method and path")
 		return
@@ -433,6 +484,18 @@ func (s *Server) handlePreflight(w http.ResponseWriter, r *http.Request, origin 
 		methods = strings.Join(route.Methods, ", ")
 	}
 	w.Header().Set("Access-Control-Allow-Methods", methods)
+=======
+	if route == nil {
+		writeError(w, http.StatusNotFound, "route_not_found", "no route matches this method and path")
+		return
+	}
+	requestedHeaders := r.Header.Get("Access-Control-Request-Headers")
+	if !allowedCORSHeaders(requestedHeaders) {
+		writeError(w, http.StatusForbidden, "headers_not_allowed", "the requested CORS headers are not allowed")
+		return
+	}
+	w.Header().Set("Access-Control-Allow-Methods", strings.Join(route.Methods, ", "))
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 	w.Header().Set("Access-Control-Max-Age", "600")
 	w.WriteHeader(http.StatusNoContent)
@@ -458,8 +521,11 @@ func allowedCORSHeaders(requested string) bool {
 }
 
 func (s *Server) match(method, path string) *Route {
+<<<<<<< HEAD
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	for i := range s.config.Routes {
 		route := &s.config.Routes[i]
 		if route.Path != path {
@@ -473,6 +539,7 @@ func (s *Server) match(method, path string) *Route {
 	}
 	return nil
 }
+<<<<<<< HEAD
 func (s *Server) matchAnyMethod(path string) *Route {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -485,16 +552,25 @@ func (s *Server) matchAnyMethod(path string) *Route {
 }
 
 func (s *Server) authorized(header string, tokens []string) bool {
+=======
+
+func (s *Server) authorized(header string) bool {
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	const prefix = "Bearer "
 	if !strings.HasPrefix(header, prefix) {
 		return false
 	}
 	presented := strings.TrimSpace(strings.TrimPrefix(header, prefix))
+<<<<<<< HEAD
 	for _, token := range tokens {
+=======
+	for _, token := range s.config.Tokens {
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 		if subtle.ConstantTimeCompare([]byte(presented), []byte(token)) == 1 {
 			return true
 		}
 	}
+<<<<<<< HEAD
 	return false
 }
 
@@ -503,15 +579,69 @@ func (s *Server) dispatchHTTP(w http.ResponseWriter, r *http.Request, rawTarget 
 	forwardURL := *target
 	forwardURL.Path = joinPaths(target.Path, r.URL.Path)
 	forwardURL.RawQuery = r.URL.RawQuery
+=======
+	s.tokensMu.RLock()
+	_, issued := s.issuedTokens[presented]
+	s.tokensMu.RUnlock()
+	if issued {
+		return true
+	}
+	return false
+}
+
+func (s *Server) issueToken(w http.ResponseWriter, r *http.Request) {
+	var credentials struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	if err := decoder.Decode(&credentials); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json", "body must be a JSON object with username and password")
+		return
+	}
+	valid := false
+	for _, configured := range s.config.Credentials {
+		if subtle.ConstantTimeCompare([]byte(credentials.Username), []byte(configured.Username)) == 1 && subtle.ConstantTimeCompare([]byte(credentials.Password), []byte(configured.Password)) == 1 {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		writeError(w, http.StatusUnauthorized, "invalid_credentials", "username or password is incorrect")
+		return
+	}
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		writeError(w, http.StatusInternalServerError, "token_generation_failed", "could not create an access token")
+		return
+	}
+	token := base64.RawURLEncoding.EncodeToString(bytes)
+	s.tokensMu.Lock()
+	s.issuedTokens[token] = struct{}{}
+	s.tokensMu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{"access_token": token, "token_type": "Bearer"})
+}
+
+func (s *Server) dispatchHTTP(w http.ResponseWriter, r *http.Request, rawTarget string) {
+	target, _ := url.Parse(rawTarget) // Config validation has already verified this.
+	forwardURL := *target
+	forwardURL.Path = joinPaths(target.Path, r.URL.Path)
+	forwardURL.RawQuery = r.URL.RawQuery
+
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	request, err := http.NewRequestWithContext(r.Context(), r.Method, forwardURL.String(), r.Body)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "upstream_request_failed", "could not create upstream request")
 		return
 	}
 	copyHeaders(request.Header, r.Header)
+<<<<<<< HEAD
 	request.Header.Del("Authorization")
 	request.Header.Del("Cookie")
 	request.Header.Del("Proxy-Authorization")
+=======
+	request.Header.Del("Authorization") // Do not leak this server's bearer token upstream.
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	request.Host = target.Host
 	response, err := s.client.Do(request)
 	if err != nil {
@@ -520,10 +650,13 @@ func (s *Server) dispatchHTTP(w http.ResponseWriter, r *http.Request, rawTarget 
 	}
 	defer response.Body.Close()
 	copyHeaders(w.Header(), response.Header)
+<<<<<<< HEAD
 	w.Header().Del("Set-Cookie")
 	w.Header().Del("Set-Cookie2")
 	w.Header().Del("WWW-Authenticate")
 	w.Header().Del("Server")
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 	w.WriteHeader(response.StatusCode)
 	_, _ = io.Copy(w, response.Body)
 }
@@ -535,7 +668,14 @@ func joinPaths(base, request string) string {
 	return strings.TrimRight(base, "/") + "/" + strings.TrimLeft(request, "/")
 }
 
+<<<<<<< HEAD
 var hopHeaders = map[string]struct{}{"Connection": {}, "Keep-Alive": {}, "Proxy-Authenticate": {}, "Proxy-Authorization": {}, "Te": {}, "Trailer": {}, "Transfer-Encoding": {}, "Upgrade": {}}
+=======
+var hopHeaders = map[string]struct{}{
+	"Connection": {}, "Keep-Alive": {}, "Proxy-Authenticate": {}, "Proxy-Authorization": {},
+	"Te": {}, "Trailer": {}, "Transfer-Encoding": {}, "Upgrade": {},
+}
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 
 func copyHeaders(destination, source http.Header) {
 	for key, values := range source {
@@ -548,6 +688,7 @@ func copyHeaders(destination, source http.Header) {
 	}
 }
 
+<<<<<<< HEAD
 type captureWriter struct {
 	http.ResponseWriter
 	status  int
@@ -595,11 +736,17 @@ func requestHookAfterRequested(r *http.Request) bool {
 	return ok && value != nil && value != false && value != ""
 }
 
+=======
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 func writeError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": message}})
 }

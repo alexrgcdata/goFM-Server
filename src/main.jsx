@@ -2,10 +2,6 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import './styles.css'
-<<<<<<< HEAD
-import './v102.css'
-=======
->>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

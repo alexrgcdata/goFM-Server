@@ -1,5 +1,6 @@
 module gofm-server
 
+<<<<<<< HEAD
 go 1.25.0
 
 require modernc.org/sqlite v1.57.0
@@ -15,3 +16,6 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+=======
+go 1.22
+>>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6

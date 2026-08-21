@@ -2,12 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-<<<<<<< HEAD
-  // Lets this admin panel live in its own subfolder without replacing an
-  // existing OpenBridge site's index.html.
-  base: process.env.VITE_APP_BASE_PATH || '/',
-=======
->>>>>>> 0d8871589256cb66840deaca1805331e2759ccc6
   plugins: [react()],
   server: {
     // A fixed origin makes the matching server-side CORS setting predictable.
