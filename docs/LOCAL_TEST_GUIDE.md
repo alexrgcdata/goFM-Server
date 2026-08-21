@@ -21,7 +21,21 @@ PowerShell first creates an encrypted log key and a local log directory:
 
 `New-Item -ItemType Directory -Force logs`
 
-`$env:GOFM_LOG_KEY = [Convert]::ToBase64String((1..32 | ForEach-Object { [byte](Get-Random -Maximum 256) }))`
+```powershell
+function New-SecureBase64Key {
+    $keyBytes = New-Object byte[] 32
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $generator.GetBytes($keyBytes)
+    }
+    finally {
+        $generator.Dispose()
+    }
+    [Convert]::ToBase64String($keyBytes)
+}
+
+$env:GOFM_LOG_KEY = New-SecureBase64Key
+```
 
 `go run ./cmd/gofm-server -config ./config.json`
 

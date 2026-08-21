@@ -1,23 +1,43 @@
 package server
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
 	"strings"
+
+	"gofm-server/internal/filemaker"
 )
 
 // Config describes the server's listener, accepted bearer tokens, and routes.
 type Config struct {
-	Address     string        `json:"address"`
-	BasePath    string        `json:"base_path,omitempty"`
-	Tokens      []string      `json:"tokens"`
-	AdminTokens []string      `json:"admin_tokens"`
-	CORSOrigins []string      `json:"cors_origins"`
-	Routes      []Route       `json:"routes"`
-	Logs        LogConfig     `json:"logs"`
-	Storage     StorageConfig `json:"storage"`
+	Address              string             `json:"address"`
+	BasePath             string             `json:"base_path,omitempty"`
+	Tokens               []string           `json:"tokens,omitempty"`
+	AdminTokens          []string           `json:"admin_tokens,omitempty"`
+	TokenEnv             string             `json:"token_env,omitempty"`
+	AdminTokenEnv        string             `json:"admin_token_env,omitempty"`
+	CORSOrigins          []string           `json:"cors_origins"`
+	Routes               []Route            `json:"routes"`
+	Logs                 LogConfig          `json:"logs"`
+	Storage              StorageConfig      `json:"storage"`
+	Credentials          VaultConfig        `json:"credentials"`
+	Security             SecurityConfig     `json:"security"`
+	FileMakerConnections []filemaker.Target `json:"filemaker_connections,omitempty"`
+}
+
+type VaultConfig struct {
+	File             string `json:"file"`
+	EncryptionKeyEnv string `json:"encryption_key_env"`
+}
+
+type SecurityConfig struct {
+	MaxRequestBodyBytes    int64    `json:"max_request_body_bytes"`
+	RateLimitPerMinute     int      `json:"rate_limit_per_minute"`
+	UpstreamTimeoutSeconds int      `json:"upstream_timeout_seconds"`
+	AllowedUpstreamHosts   []string `json:"allowed_upstream_hosts,omitempty"`
 }
 
 type StorageConfig struct {
@@ -40,6 +60,7 @@ type Route struct {
 	Methods []string   `json:"methods"`
 	Target  Target     `json:"target"`
 	Hooks   HookConfig `json:"hooks,omitempty"`
+	Auth    string     `json:"auth,omitempty"`
 }
 
 // HookConfig names future lifecycle hooks. v1.0.2 records these names and any
@@ -79,6 +100,20 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("base_path must be empty or a non-root path beginning with /")
 		}
 	}
+	if c.TokenEnv != "" {
+		token := strings.TrimSpace(os.Getenv(c.TokenEnv))
+		if token == "" {
+			return fmt.Errorf("application token environment variable %s is empty", c.TokenEnv)
+		}
+		c.Tokens = append(c.Tokens, token)
+	}
+	if c.AdminTokenEnv != "" {
+		token := strings.TrimSpace(os.Getenv(c.AdminTokenEnv))
+		if token == "" {
+			return fmt.Errorf("admin token environment variable %s is empty", c.AdminTokenEnv)
+		}
+		c.AdminTokens = append(c.AdminTokens, token)
+	}
 	for i := range c.Tokens {
 		c.Tokens[i] = strings.TrimSpace(c.Tokens[i])
 		if c.Tokens[i] == "" {
@@ -91,8 +126,59 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("admin_tokens[%d] is empty", i)
 		}
 	}
+	if len(c.Tokens) == 0 {
+		return fmt.Errorf("an application token must be configured through token_env")
+	}
 	if len(c.AdminTokens) == 0 {
-		c.AdminTokens = append([]string(nil), c.Tokens...)
+		return fmt.Errorf("a separate administrator token must be configured through admin_token_env")
+	}
+	for _, application := range c.Tokens {
+		for _, administrator := range c.AdminTokens {
+			if application == administrator {
+				return fmt.Errorf("application and administrator tokens must be different")
+			}
+		}
+	}
+	if c.Security.MaxRequestBodyBytes == 0 {
+		c.Security.MaxRequestBodyBytes = 1 << 20
+	}
+	if c.Security.MaxRequestBodyBytes < 1024 || c.Security.MaxRequestBodyBytes > 64<<20 {
+		return fmt.Errorf("security.max_request_body_bytes must be between 1024 and 67108864")
+	}
+	if c.Security.RateLimitPerMinute == 0 {
+		c.Security.RateLimitPerMinute = 120
+	}
+	if c.Security.RateLimitPerMinute < 1 || c.Security.RateLimitPerMinute > 100000 {
+		return fmt.Errorf("security.rate_limit_per_minute must be between 1 and 100000")
+	}
+	if c.Security.UpstreamTimeoutSeconds == 0 {
+		c.Security.UpstreamTimeoutSeconds = 30
+	}
+	if c.Security.UpstreamTimeoutSeconds < 1 || c.Security.UpstreamTimeoutSeconds > 300 {
+		return fmt.Errorf("security.upstream_timeout_seconds must be between 1 and 300")
+	}
+	for i, host := range c.Security.AllowedUpstreamHosts {
+		host = strings.TrimSpace(host)
+		if host == "" || strings.ContainsAny(host, "/?#@") {
+			return fmt.Errorf("security.allowed_upstream_hosts[%d] must be a host or host:port", i)
+		}
+		c.Security.AllowedUpstreamHosts[i] = host
+	}
+	if (c.Credentials.File == "") != (c.Credentials.EncryptionKeyEnv == "") {
+		return fmt.Errorf("credentials.file and credentials.encryption_key_env must be configured together")
+	}
+	if c.Credentials.File != "" {
+		if err := validateEncryptionKey(c.Credentials.EncryptionKeyEnv); err != nil {
+			return fmt.Errorf("credentials: %w", err)
+		}
+	}
+	if c.Logs.File != "" {
+		if c.Logs.EncryptionKeyEnv == "" {
+			return fmt.Errorf("logs.file requires logs.encryption_key_env")
+		}
+		if err := validateEncryptionKey(c.Logs.EncryptionKeyEnv); err != nil {
+			return fmt.Errorf("logs: %w", err)
+		}
 	}
 	if c.Logs.MaxEntries == 0 {
 		c.Logs.MaxEntries = 50
@@ -109,6 +195,17 @@ func (c *Config) Validate() error {
 		c.CORSOrigins[i] = origin
 	}
 	seen := make(map[string]struct{})
+	connections := make(map[string]struct{})
+	for i := range c.FileMakerConnections {
+		connection := &c.FileMakerConnections[i]
+		if err := connection.Validate(); err != nil {
+			return err
+		}
+		if _, exists := connections[connection.Name]; exists {
+			return fmt.Errorf("duplicate FileMaker connection %s", connection.Name)
+		}
+		connections[connection.Name] = struct{}{}
+	}
 	for i := range c.Routes {
 		route := &c.Routes[i]
 		if route.ID == "" {
@@ -119,6 +216,12 @@ func (c *Config) Validate() error {
 		}
 		if route.Hooks.After == "" {
 			route.Hooks.After = "fireGoHookAfter"
+		}
+		if route.Auth == "" {
+			route.Auth = "application"
+		}
+		if route.Auth != "application" && route.Auth != "admin" {
+			return fmt.Errorf("routes[%d].auth must be application or admin", i)
 		}
 		if !strings.HasPrefix(route.Path, "/") || route.Path == "/" {
 			return fmt.Errorf("routes[%d].path must be a non-root path beginning with /", i)
@@ -144,6 +247,15 @@ func (c *Config) Validate() error {
 			}
 			seen[key] = struct{}{}
 		}
+	}
+	return nil
+}
+
+func validateEncryptionKey(environment string) error {
+	encoded := strings.TrimSpace(os.Getenv(environment))
+	key, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(key) != 32 {
+		return fmt.Errorf("%s must contain a base64-encoded 32-byte key", environment)
 	}
 	return nil
 }

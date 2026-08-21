@@ -1,33 +1,49 @@
 {
-  "address": ":8080",
-  "tokens": ["replace-with-a-long-random-token"],
-  "admin_tokens": ["replace-with-a-long-admin-token"],
+  "address": "127.0.0.1:8080",
+  "token_env": "GOFM_APP_TOKEN",
+  "admin_token_env": "GOFM_ADMIN_TOKEN",
   "cors_origins": ["http://localhost:5173"],
+  "security": {
+    "max_request_body_bytes": 1048576,
+    "rate_limit_per_minute": 120,
+    "upstream_timeout_seconds": 30,
+    "allowed_upstream_hosts": ["127.0.0.1:3001", "127.0.0.1:3002"]
+  },
   "logs": {
     "max_entries": 50,
+    "file": "logs/requests.enc",
+    "encryption_key_env": "GOFM_LOG_KEY",
     "capture_body_preview": false
   },
   "storage": {
     "db_file": "data/gofm.sqlite"
   },
+  "credentials": {
+    "file": "secrets/credentials.enc",
+    "encryption_key_env": "GOFM_VAULT_KEY"
+  },
+  "filemaker_connections": [],
   "routes": [
     {
       "id": "echo",
       "path": "/api/echo",
       "methods": ["GET", "POST"],
-      "target": { "type": "http", "url": "http://localhost:3001" }
+      "auth": "application",
+      "target": { "type": "http", "url": "http://127.0.0.1:3001" }
     },
     {
       "id": "inventory",
       "path": "/api/inventory",
       "methods": ["GET"],
-      "target": { "type": "http", "url": "http://localhost:3002" }
+      "auth": "application",
+      "target": { "type": "http", "url": "http://127.0.0.1:3002" }
     },
     {
       "id": "failure-demo",
       "path": "/api/failure",
       "methods": ["GET"],
-      "target": { "type": "http", "url": "http://localhost:3999" }
+      "auth": "application",
+      "target": { "type": "http", "url": "http://127.0.0.1:3999" }
     }
   ]
 }

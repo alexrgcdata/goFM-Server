@@ -69,6 +69,9 @@ func newLogStore(config LogConfig) (*logStore, error) {
 func (s *logStore) add(entry LogEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.max <= 0 {
+		return
+	}
 	s.entries = append(s.entries, entry)
 	if len(s.entries) > s.max {
 		s.entries = s.entries[len(s.entries)-s.max:]
@@ -76,6 +79,27 @@ func (s *logStore) add(entry LogEntry) {
 	if s.file != "" {
 		_ = s.persistLocked()
 	}
+}
+
+func (s *logStore) setLimit(limit int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.max = limit
+	if limit == 0 {
+		s.entries = nil
+	} else if len(s.entries) > limit {
+		s.entries = s.entries[len(s.entries)-limit:]
+	}
+	if s.file != "" {
+		return s.persistLocked()
+	}
+	return nil
+}
+
+func (s *logStore) limit() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.max
 }
 
 func (s *logStore) list() []LogEntry {

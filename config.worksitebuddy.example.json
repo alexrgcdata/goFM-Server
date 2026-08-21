@@ -1,9 +1,15 @@
 {
   "address": "127.0.0.1:8080",
-  "base_path": "/openbridge/api",
-  "tokens": ["REPLACE_WITH_A_LONG_APPLICATION_TOKEN"],
-  "admin_tokens": ["REPLACE_WITH_A_SEPARATE_LONG_ADMIN_TOKEN"],
+  "base_path": "/openbridge/go",
+  "token_env": "GOFM_APP_TOKEN",
+  "admin_token_env": "GOFM_ADMIN_TOKEN",
   "cors_origins": ["https://worksitebuddy.com", "https://www.worksitebuddy.com"],
+  "security": {
+    "max_request_body_bytes": 1048576,
+    "rate_limit_per_minute": 120,
+    "upstream_timeout_seconds": 30,
+    "allowed_upstream_hosts": []
+  },
   "logs": {
     "max_entries": 50,
     "file": "logs/requests.enc",
@@ -11,12 +17,10 @@
     "capture_body_preview": false
   },
   "storage": { "db_file": "data/gofm.sqlite" },
-  "routes": [
-    {
-      "id": "replace-with-your-first-route",
-      "path": "/echo",
-      "methods": ["GET", "POST"],
-      "target": { "type": "http", "url": "https://YOUR-UPSTREAM.example.com" }
-    }
-  ]
+  "credentials": {
+    "file": "secrets/credentials.enc",
+    "encryption_key_env": "GOFM_VAULT_KEY"
+  },
+  "filemaker_connections": [],
+  "routes": []
 }

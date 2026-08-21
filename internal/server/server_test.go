@@ -1,13 +1,31 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestSQLiteStoresMetadataWithoutResponsePreview(t *testing.T) {
+	server := New(Config{Tokens: []string{"app"}, AdminTokens: []string{"admin"}, Logs: LogConfig{MaxEntries: 10, CaptureBodyPreview: true}, Storage: StorageConfig{DBFile: filepath.Join(t.TempDir(), "gofm.sqlite")}})
+	defer server.store.Close()
+	server.ServeHTTP(newRecorder(), newRequest(t, http.MethodGet, "/health", nil))
+	records, err := server.store.Recent(context.Background(), 10)
+	if err != nil || len(records) != 1 {
+		t.Fatalf("read SQLite metadata: records=%d err=%v", len(records), err)
+	}
+	if records[0].ResponsePreview != "" {
+		t.Fatal("SQLite stored a response preview in plaintext")
+	}
+	if len(server.logs.list()) != 1 || server.logs.list()[0].ResponsePreview == "" {
+		t.Fatal("encrypted-capable log store did not retain the configured preview")
+	}
+}
 
 type responseRecorder struct {
 	header http.Header
@@ -83,6 +101,47 @@ func TestProtectedRouteRequiresBearerToken(t *testing.T) {
 	testServer("http://example.invalid").ServeHTTP(response, newRequest(t, http.MethodGet, "/api/echo", nil))
 	if response.status != http.StatusUnauthorized || response.Header().Get("WWW-Authenticate") != "Bearer" {
 		t.Fatalf("got status %d and WWW-Authenticate %q", response.status, response.Header().Get("WWW-Authenticate"))
+	}
+}
+
+func TestRequestBodyLimitIsEnforced(t *testing.T) {
+	server := testServer("http://example.invalid")
+	server.config.Security.MaxRequestBodyBytes = 1024
+	request := newRequest(t, http.MethodPost, "/api/echo", strings.NewReader(strings.Repeat("x", 1025)))
+	request.Header.Set("Authorization", "Bearer test-token")
+	response := newRecorder()
+	server.ServeHTTP(response, request)
+	if response.status != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want 413", response.status)
+	}
+	logs := server.logs.list()
+	if len(logs) != 1 || logs[0].Outcome != "failure" || logs[0].Status != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized request failure was not logged: %#v", logs)
+	}
+}
+
+func TestRateLimitIsEnforced(t *testing.T) {
+	server := testServer("http://example.invalid")
+	server.limits = newRateLimiter(1)
+	for i, want := range []int{http.StatusOK, http.StatusTooManyRequests} {
+		response := newRecorder()
+		request := newRequest(t, http.MethodGet, "/health", nil)
+		request.RemoteAddr = "127.0.0.1:5000"
+		server.ServeHTTP(response, request)
+		if response.status != want {
+			t.Fatalf("request %d status = %d, want %d", i+1, response.status, want)
+		}
+	}
+}
+
+func TestAdminAuthorizedRouteRejectsApplicationToken(t *testing.T) {
+	server := New(Config{Tokens: []string{"app"}, AdminTokens: []string{"admin"}, Routes: []Route{{Path: "/private", Methods: []string{"GET"}, Auth: "admin", Target: Target{Type: "http", URL: "http://example.invalid"}}}})
+	request := newRequest(t, http.MethodGet, "/private", nil)
+	request.Header.Set("Authorization", "Bearer app")
+	response := newRecorder()
+	server.ServeHTTP(response, request)
+	if response.status != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", response.status)
 	}
 }
 

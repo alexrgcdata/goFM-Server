@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"gofm-server/internal/server"
 )
@@ -19,8 +20,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	httpServer := &http.Server{
+		Addr:              config.Address,
+		Handler:           server.New(config),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       90 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
 	log.Printf("goFM Server listening on %s", config.Address)
-	if err := http.ListenAndServe(config.Address, server.New(config)); err != nil {
+	if err := httpServer.ListenAndServe(); err != nil {
 		log.Printf("server stopped: %v", err)
 		os.Exit(1)
 	}
