@@ -18,3 +18,6 @@ jobs:
       - run: test -z "$(gofmt -l cmd internal)"
       - run: go vet ./...
       - run: go test ./...
+      - run: go test -race ./internal/api ./cmd/gofm-server
+      - run: go build -trimpath -o bin/gofm-server ./cmd/gofm-server
+      - run: GOOS=windows GOARCH=amd64 go build -trimpath -o bin/gofm-server.exe ./cmd/gofm-server
