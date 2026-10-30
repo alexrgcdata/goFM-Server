@@ -7,6 +7,7 @@ bin/
 # Local configuration and secrets
 config.json
 config.local.json
+config.*.local.json
 data/
 logs/
 .env

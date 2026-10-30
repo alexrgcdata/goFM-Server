@@ -1,5 +1,11 @@
 # goFM Server
 
+This is a historical description of the older gateway. Start with the
+[current README](../README.md) for the supported local dispatcher. The retained
+gateway has a separate entry point and configuration; its React dashboard does
+not test the current dispatcher. Retained tests do not establish connected
+FileMaker acceptance or production readiness.
+
 A deliberately small Go server scaffold for receiving REST/curl requests,
 authenticating protected endpoints, and routing them to fixed HTTP targets.
 A React JSX example client lives in `web/`.
@@ -10,11 +16,11 @@ or FastCGI bridge and configure that bridge as the route's fixed HTTP target.
 
 ## Start locally
 
-1. Copy `config.example.json` to `config.json`, replace its sample token, and
-   point the example routes at services you control. Its `cors_origins` entry
+1. Copy `config.legacy.example.json` to ignored `config.legacy.local.json` and configure its required token/key
+   environment variables and approved upstreams. Its `cors_origins` entry
    already permits the bundled React development client at
    `http://localhost:5173`.
-2. Start the server with `go run ./cmd/gofm-server -config config.json`.
+2. The separate legacy command is `go run ./cmd/legacy-gateway -config config.legacy.local.json`.
 3. Check the public health endpoint:
 
    ```sh
@@ -32,7 +38,7 @@ The server never forwards that bearer token to the configured upstream.
 
 ## Project layout
 
-- `cmd/gofm-server/`: executable entry point.
+- `cmd/legacy-gateway/`: legacy executable entry point.
 - `internal/server/`: configuration, auth, route matching, and HTTP proxy.
 - `web/`: standalone Vite + React JSX request client.
 - `docs/`: scope and delegation notes.

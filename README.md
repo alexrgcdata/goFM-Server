@@ -1,25 +1,27 @@
 # goFM Server
 
-A small Go traffic controller. Send an authenticated JSON request, select a
-registered action, pass dynamic parameters, and get a typed JSON result.
-The default server needs **no database, SQLite, Node, React, FileMaker, or AI
-service**. It uses only Go's standard library.
-
-## The backend in practice
-
-These are designed presentations of actual HTTP responses captured from the
-locally running dispatcher, with synthetic input and the bearer token redacted.
-They are not screenshots of a dashboard or a public hosted API.
-
-![Authenticated echo request and typed JSON response](docs/images/request-response.jpg)
-
-![Missing-token rejection and registered demo actions](docs/images/auth-actions.jpg)
+A Go HTTP server that routes authenticated JSON requests to named functions.
+I built it as a small starting point for integration work: a clear request
+contract, a private config token, and functions that are easy to read and change.
+The default dispatcher uses only Go's standard library and needs no database or
+external service. The current examples return dummy values; they do not connect
+to FileMaker.
 
 ## Start locally (Go)
 
-From `C:\AlexSeidler\projects\goFM-Server` with Go 1.25 or newer:
+Install Go first. The module declares Go 1.25; the current checks use Go 1.26.
+Clone the public repository, or download and extract its
+[source ZIP](https://github.com/alexrgcdata/goFM-Server/archive/refs/heads/main.zip)
+and open a terminal in the extracted project folder.
 
-```powershell
+```sh
+git clone https://github.com/alexrgcdata/goFM-Server.git
+cd goFM-Server
+```
+
+From the project root:
+
+```sh
 go run ./cmd/gofm-server -init-config
 go run ./cmd/gofm-server
 ```
@@ -42,7 +44,16 @@ In a second PowerShell window, from the same folder:
 This reads the token privately, checks health, calls all four actions, validates
 the results, and verifies a missing token receives HTTP 401. The default demo URL
 is `http://127.0.0.1:8080`; use `-BaseUrl` if you changed the listener.
-Stop the server with Ctrl+C. It allows up to ten seconds for active requests.
+The Go commands work on Windows, macOS, and Linux. The demo script requires
+PowerShell. To check health from another terminal on any platform, open
+`http://127.0.0.1:8080/health` in a browser or run:
+
+```sh
+curl http://127.0.0.1:8080/health
+```
+
+Use your own local token in the Authorization header for authenticated requests.
+Stop the server with Ctrl+C; it allows up to ten seconds for active requests.
 
 ## Request and response
 
@@ -89,6 +100,16 @@ HTTP errors: 400 invalid JSON/parameters/time, 401 invalid or missing token,
 type, 500 internal action error. The default body limit is 64 KiB; config allows
 1 KiB through 1 MiB. Internal error details and tokens are never returned.
 
+## The backend in practice
+
+These are designed presentations of actual HTTP responses captured from the
+locally running dispatcher, with synthetic input and the bearer token redacted.
+They are not screenshots of a dashboard or a public hosted API.
+
+![Authenticated echo request and typed JSON response](docs/images/request-response.jpg)
+
+![Missing-token rejection and registered demo actions](docs/images/auth-actions.jpg)
+
 ## Where to work
 
 - `internal/api/api.go`: commented HTTP routes, request/response types, auth,
@@ -115,7 +136,7 @@ go build -trimpath -o ./bin/gofm-server.exe ./cmd/gofm-server
 ```
 
 There is **no Go `dist` folder**. This Windows executable is
-`C:\AlexSeidler\projects\goFM-Server\bin\gofm-server.exe`; run it from the
+`bin/gofm-server.exe` relative to your clone; run it from the
 repository root so it finds `config.local.json`, or pass an explicit `-config`.
 The executable does not embed or copy the token/config. A Linux build is:
 
@@ -145,7 +166,19 @@ separate gateway, not the default dispatcher. See
 [legacy overview](docs/LEGACY_GATEWAY.md). The historical committed config was
 removed from tracking; the current server uses a newly generated token.
 
-## Expand after the basics
+## Checks and remaining work
 
-See [the short expansion plan](docs/EXPANSION.md). The starting point is a
-working generic dispatcher, not an identity system or integration platform.
+GitHub Actions runs formatting, `go vet ./...`, the full test suite, race checks
+for the dispatcher and CLI, and Linux/Windows builds. The local demo also checks
+real HTTP requests against the compiled Windows server. See
+[the verification receipt](READINESS.md) for checked revisions and boundaries.
+
+This is a local demo with a shared token, not an audited production service.
+FileMaker delivery is the next proposed feature: send a JSON package to a chosen
+OData field, then optionally call an approved script. That flow is not implemented
+in the default dispatcher. Writes and script execution will need separate outcomes
+so a script failure does not encourage duplicate deliveries.
+
+See [the expansion plan](docs/EXPANSION.md) for later options. No hosted backend,
+per-user permissions, persistent jobs, or automatic retries are provided today.
+There is no versioned binary release; GitHub's ZIP contains source code.
