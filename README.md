@@ -5,6 +5,16 @@ registered action, pass dynamic parameters, and get a typed JSON result.
 The default server needs **no database, SQLite, Node, React, FileMaker, or AI
 service**. It uses only Go's standard library.
 
+## The backend in practice
+
+These are designed presentations of actual HTTP responses captured from the
+locally running dispatcher, with synthetic input and the bearer token redacted.
+They are not screenshots of a dashboard or a public hosted API.
+
+![Authenticated echo request and typed JSON response](docs/images/request-response.jpg)
+
+![Missing-token rejection and registered demo actions](docs/images/auth-actions.jpg)
+
 ## Start locally (Go)
 
 From `C:\AlexSeidler\projects\goFM-Server` with Go 1.25 or newer:
