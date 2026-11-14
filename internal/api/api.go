@@ -60,7 +60,11 @@ func New(c Config) (*Server, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
-	return &Server{tokenHash: sha256.Sum256([]byte(c.Token)), maxBytes: c.MaxRequestBytes, actions: actionRoutes()}, nil
+	return &Server{
+		tokenHash: sha256.Sum256([]byte(c.Token)),
+		maxBytes:  c.MaxRequestBytes,
+		actions:   actionRoutes(),
+	}, nil
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -73,8 +77,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Request-ID", id)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+
 	reply := func(status int, result any, code, message string) {
-		response := Response{Success: status < 400, Result: result, RequestID: id, Time: time.Now().UTC().Format(time.RFC3339Nano)}
+		response := Response{
+			Success:   status < http.StatusBadRequest,
+			Result:    result,
+			RequestID: id,
+			Time:      time.Now().UTC().Format(time.RFC3339Nano),
+		}
 		if code != "" {
 			response.Error = &APIError{Code: code, Message: message}
 		}
@@ -82,7 +92,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(response)
 	}
-	// HTTP routes live here; the action routes above choose the application job.
+
+	// Choose the HTTP endpoint before looking up the caller's requested action.
 	switch r.URL.Path {
 	case "/health":
 		if r.Method != http.MethodGet {
@@ -120,14 +131,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reply(415, nil, "unsupported_media_type", "use Content-Type: application/json")
 		return
 	}
+
+	// Enforce the limit while reading, even when there is no Content-Length.
 	r.Body = http.MaxBytesReader(w, r.Body, s.maxBytes)
 	defer r.Body.Close()
-	d := json.NewDecoder(r.Body)
-	d.DisallowUnknownFields()
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
 	var request Request
-	err = d.Decode(&request)
+	err = decoder.Decode(&request)
+	// A second decode must reach EOF after the first object.
 	if err == nil {
-		if trailing := d.Decode(new(any)); trailing != io.EOF {
+		if trailing := decoder.Decode(new(any)); trailing != io.EOF {
 			if trailing == nil {
 				trailing = errors.New("extra JSON value")
 			}
@@ -143,6 +157,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
 	if request.Action == "" || len(request.Action) > 64 || request.Params == nil {
 		reply(400, nil, "invalid_request", "action is required and params must be an array")
 		return
@@ -153,12 +168,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	fn, ok := s.actions[request.Action]
+
+	handleAction, ok := s.actions[request.Action]
 	if !ok {
 		reply(404, nil, "unknown_action", "action is not registered")
 		return
 	}
-	result, err := fn(r.Context(), request.Params)
+	result, err := handleAction(r.Context(), request.Params)
 	if err != nil {
 		// Only explicitly safe validation messages are exposed to callers.
 		var invalid *ParamsError

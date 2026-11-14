@@ -22,6 +22,7 @@ func main() {
 	path := flag.String("config", "config.local.json", "private JSON configuration file")
 	init := flag.Bool("init-config", false, "create a private configuration with a random token, then exit")
 	flag.Parse()
+
 	if *init {
 		if err := initConfig(*path); err != nil {
 			log.Printf("initialize config: %v", err)
@@ -41,7 +42,14 @@ func initConfig(path string) error {
 	if _, err := rand.Read(token); err != nil {
 		return err
 	}
-	config := api.Config{Address: "127.0.0.1:8080", Token: hex.EncodeToString(token), MaxRequestBytes: 65536}
+	config := api.Config{
+		Address:         "127.0.0.1:8080",
+		Token:           hex.EncodeToString(token),
+		MaxRequestBytes: 65536,
+	}
+
+	// Exclusive creation leaves an existing token in place.
+
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
@@ -63,9 +71,13 @@ func run(path string) error {
 		return err
 	}
 	srv := &http.Server{
-		Addr: config.Address, Handler: handler,
-		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
-		WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10,
+		Addr:              config.Address,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    16 << 10,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
