@@ -2,13 +2,14 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
 
-type Metrics = {
+type Counters = {
   uptime_seconds: number
   requests: number
   errors: number
   average_response_ms: number
-  recent: TrafficEntry[]
 }
+
+type Metrics = Counters & { recent: TrafficEntry[] }
 
 type TrafficEntry = {
   time: string
@@ -19,8 +20,21 @@ type TrafficEntry = {
   error_code?: string
 }
 
-function isMetrics(value: unknown): value is Metrics {
+function isCounters(value: unknown): value is Counters {
   if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  return ['uptime_seconds', 'requests', 'errors', 'average_response_ms'].every(
+    (name) => {
+      const field = Reflect.get(value, name)
+      return typeof field === 'number' && Number.isFinite(field) && field >= 0
+    },
+  )
+}
+
+function isMetrics(value: unknown): value is Metrics {
+  if (!isCounters(value)) {
     return false
   }
 
@@ -34,11 +48,74 @@ function isMetrics(value: unknown): value is Metrics {
     return false
   }
 
-  return ['uptime_seconds', 'requests', 'errors', 'average_response_ms'].every(
-    (name) => {
-      const field = Reflect.get(value, name)
-      return typeof field === 'number' && Number.isFinite(field) && field >= 0
-    },
+  return true
+}
+
+function MetricsCards({ metrics }: { metrics: Counters }) {
+  return (
+    <dl>
+      <div><dt>Uptime</dt><dd>{metrics.uptime_seconds} s</dd></div>
+      <div><dt>API requests</dt><dd>{metrics.requests}</dd></div>
+      <div><dt>API errors</dt><dd>{metrics.errors}</dd></div>
+      <div><dt>Average response</dt><dd>{metrics.average_response_ms.toFixed(2)} ms</dd></div>
+    </dl>
+  )
+}
+
+function NodeMetrics() {
+  const [token, setToken] = useState('')
+  const [metrics, setMetrics] = useState<Counters | null>(null)
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function refresh(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setLoading(true)
+    setMetrics(null)
+    setMessage('')
+
+    try {
+      const response = await fetch('/admin/node/metrics', {
+        headers: { Authorization: 'Bearer ' + token.trim() },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (response.status === 401) {
+        throw new Error('Check your Node API token.')
+      }
+      if (!response.ok) {
+        throw new Error('Node metrics are unavailable.')
+      }
+
+      const data = await response.json()
+      if (!isCounters(data.result)) {
+        throw new Error('Node returned an unexpected metrics response.')
+      }
+
+      setMetrics(data.result)
+      setMessage('Updated at ' + new Date().toLocaleTimeString())
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not load Node metrics.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <section aria-labelledby="node-title">
+      <h2 id="node-title">Node API Router</h2>
+      <form onSubmit={refresh}>
+        <label htmlFor="node-token">Node API token</label>
+        <input id="node-token" type="password" autoComplete="off" value={token}
+          onChange={(event) => {
+            setToken(event.target.value)
+            setMetrics(null)
+            setMessage('')
+          }} required disabled={loading} />
+        <button disabled={loading}>{loading ? 'Loading…' : 'Refresh Node metrics'}</button>
+      </form>
+      <p role="status">{message}</p>
+      {metrics && <MetricsCards metrics={metrics} />}
+    </section>
   )
 }
 
@@ -130,10 +207,11 @@ function App() {
   return (
     <main>
       <p className="section-name">Workshop / Admin</p>
-      <h1>Go API Router</h1>
+      <h1>Router metrics</h1>
+      <h2>Go API Router</h2>
       <p>Health: <strong>{health}</strong></p>
       <form onSubmit={loadMetrics}>
-        <label htmlFor="token">API token</label>
+        <label htmlFor="token">Go API token</label>
         <input id="token" type="password" autoComplete="off" value={token}
           onChange={(event) => {
             setToken(event.target.value)
@@ -148,14 +226,7 @@ function App() {
       </form>
       <p role="status">{message}</p>
       {sampleResult && <><h2>PostgreSQL response</h2><pre>{sampleResult}</pre></>}
-      {metrics && (
-        <dl>
-          <div><dt>Uptime</dt><dd>{metrics.uptime_seconds} s</dd></div>
-          <div><dt>API requests</dt><dd>{metrics.requests}</dd></div>
-          <div><dt>API errors</dt><dd>{metrics.errors}</dd></div>
-          <div><dt>Average response</dt><dd>{metrics.average_response_ms.toFixed(2)} ms</dd></div>
-        </dl>
-      )}
+      {metrics && <MetricsCards metrics={metrics} />}
       {metrics && (
         <section>
           <h2>Recent API traffic</h2>
@@ -179,7 +250,8 @@ function App() {
           )}
         </section>
       )}
-      <p className="note">Counts include completed API requests and reset when Go restarts.</p>
+      <NodeMetrics />
+      <p className="note">Counts include completed API requests and reset when each router restarts.</p>
     </main>
   )
 }

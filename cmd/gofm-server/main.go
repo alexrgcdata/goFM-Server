@@ -78,6 +78,7 @@ func run(path string, dashboard string) error {
 	if dashboard != "" {
 		files := http.FileServer(http.Dir(dashboard))
 		mux.Handle("/admin/dashboard/", http.StripPrefix("/admin/dashboard/", files))
+		mux.HandleFunc("/admin/node/metrics", readNodeMetrics)
 	}
 	srv := &http.Server{
 		Addr:              config.Address,
