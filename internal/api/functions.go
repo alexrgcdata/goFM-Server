@@ -33,3 +33,16 @@ func boolean(_ context.Context, params []json.RawMessage) (any, error) {
 func echo(_ context.Context, params []json.RawMessage) (any, error) {
 	return params, nil
 }
+
+// Sample returns a fixed fictional job without reading a database.
+func sample(_ context.Context, params []json.RawMessage) (any, error) {
+	if err := noParams(params); err != nil {
+		return nil, err
+	}
+
+	return map[string]string{
+		"id":     "WORKSHOP-001",
+		"title":  "Inspect demo equipment",
+		"status": "scheduled",
+	}, nil
+}

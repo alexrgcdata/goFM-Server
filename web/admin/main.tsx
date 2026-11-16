@@ -7,10 +7,30 @@ type Metrics = {
   requests: number
   errors: number
   average_response_ms: number
+  recent: TrafficEntry[]
+}
+
+type TrafficEntry = {
+  time: string
+  request_id: string
+  action?: string
+  status: number
+  duration_ms: number
+  error_code?: string
 }
 
 function isMetrics(value: unknown): value is Metrics {
   if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const recent: unknown = Reflect.get(value, 'recent')
+  if (!Array.isArray(recent) || !recent.every((entry) =>
+    entry && typeof entry.time === 'string' && typeof entry.request_id === 'string' &&
+    typeof entry.status === 'number' && Number.isFinite(entry.duration_ms) &&
+    (entry.action === undefined || typeof entry.action === 'string') &&
+    (entry.error_code === undefined || typeof entry.error_code === 'string')
+  )) {
     return false
   }
 
@@ -28,6 +48,7 @@ function App() {
   const [metrics, setMetrics] = useState<Metrics | null>(null)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sampleResult, setSampleResult] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -50,14 +71,34 @@ function App() {
 
   async function loadMetrics(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    await refresh(false)
+  }
+
+  async function refresh(runSample: boolean) {
     setLoading(true)
     setMetrics(null)
     setMessage('')
 
     try {
+      const authorization = 'Bearer ' + token.trim()
+      if (runSample) {
+        setSampleResult('')
+        const sample = await fetch('/api', {
+          method: 'POST',
+          headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sample', params: [] }),
+          signal: AbortSignal.timeout(8000),
+        })
+        if (!sample.ok) {
+          throw new Error('Sample request failed (HTTP ' + sample.status + ').')
+        }
+        const payload = await sample.json()
+        setSampleResult(JSON.stringify(payload.result, null, 2))
+      }
+
       // Keep the token in memory and send it only to this Go server.
       const response = await fetch('/admin/metrics', {
-        headers: { Authorization: 'Bearer ' + token.trim() },
+        headers: { Authorization: authorization },
         signal: AbortSignal.timeout(8000),
       })
 
@@ -98,10 +139,15 @@ function App() {
             setToken(event.target.value)
             setMetrics(null)
             setMessage('')
+            setSampleResult('')
           }} required disabled={loading} />
         <button disabled={loading}>{loading ? 'Loading…' : 'Refresh metrics'}</button>
+        <button type="button" disabled={loading || !token.trim()} onClick={() => void refresh(true)}>
+          Run sample action
+        </button>
       </form>
       <p role="status">{message}</p>
+      {sampleResult && <><h2>Sample response</h2><pre>{sampleResult}</pre></>}
       {metrics && (
         <dl>
           <div><dt>Uptime</dt><dd>{metrics.uptime_seconds} s</dd></div>
@@ -109,6 +155,29 @@ function App() {
           <div><dt>API errors</dt><dd>{metrics.errors}</dd></div>
           <div><dt>Average response</dt><dd>{metrics.average_response_ms.toFixed(2)} ms</dd></div>
         </dl>
+      )}
+      {metrics && (
+        <section>
+          <h2>Recent API traffic</h2>
+          {metrics.recent.length === 0 ? <p>No API requests yet.</p> : (
+            <div className="traffic-table" tabIndex={0} role="region" aria-label="Recent API traffic table">
+              <table>
+                <thead><tr><th>Time</th><th>Action</th><th>Status</th><th>Duration</th><th>Request ID</th></tr></thead>
+                <tbody>
+                  {metrics.recent.map((entry) => (
+                    <tr key={entry.request_id}>
+                      <td>{new Date(entry.time).toLocaleTimeString()}</td>
+                      <td>{entry.action || '—'}</td>
+                      <td>{entry.status}{entry.error_code && <small>{entry.error_code}</small>}</td>
+                      <td>{entry.duration_ms.toFixed(2)} ms</td>
+                      <td><code>{entry.request_id}</code></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       )}
       <p className="note">Counts include completed API requests and reset when Go restarts.</p>
     </main>

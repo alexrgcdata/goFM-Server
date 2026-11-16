@@ -12,3 +12,8 @@ button:disabled { opacity: .75; cursor: wait; }
 dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .75rem; }
 dl div { background: white; border: 1px solid #dbded6; padding: .85rem; border-radius: .4rem; }
 dd { margin: .25rem 0 0; font-size: 1.45rem; font-weight: 650; }
+.traffic-table { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: white; }
+th, td { padding: .55rem; border-bottom: 1px solid #dbded6; text-align: left; white-space: nowrap; }
+td small { display: block; }
+pre { padding: .75rem; background: white; overflow: auto; }

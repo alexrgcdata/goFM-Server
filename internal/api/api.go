@@ -46,6 +46,7 @@ func actionRoutes() map[string]actionFunc {
 		"success": success, // [] -> "successful"
 		"boolean": boolean, // [] -> true (a JSON boolean, not a string)
 		"echo":    echo,    // [any JSON values...] -> those same values
+		"sample":  sample,  // [] -> a fictional workshop job
 	}
 }
 
@@ -82,6 +83,7 @@ func (s *Server) authorized(r *http.Request) bool {
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
+	actionName := ""
 	idBytes := make([]byte, 16)
 	if _, err := rand.Read(idBytes); err != nil {
 		http.Error(w, "request ID unavailable", http.StatusInternalServerError)
@@ -106,7 +108,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(response)
 		if r.URL.Path == "/api" {
-			s.metrics.record(status, time.Since(started))
+			s.metrics.record(trafficEntry{
+				Time: response.Time, RequestID: id, Action: actionName,
+				Status: status, DurationMS: float64(time.Since(started)) / float64(time.Millisecond),
+				ErrorCode: code,
+			})
 		}
 	}
 
@@ -193,6 +199,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reply(404, nil, "unknown_action", "action is not registered")
 		return
 	}
+	// Only log registered names, never text supplied for an unknown action.
+	actionName = request.Action
 	result, err := handleAction(r.Context(), request.Params)
 	if err != nil {
 		// Only explicitly safe validation messages are exposed to callers.
