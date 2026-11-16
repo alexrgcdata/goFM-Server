@@ -53,6 +53,7 @@ type Server struct {
 	tokenHash [32]byte
 	maxBytes  int64
 	actions   map[string]actionFunc
+	metrics   requestMetrics
 }
 
 // New fails closed: no server can be created with missing authentication.
@@ -64,10 +65,23 @@ func New(c Config) (*Server, error) {
 		tokenHash: sha256.Sum256([]byte(c.Token)),
 		maxBytes:  c.MaxRequestBytes,
 		actions:   actionRoutes(),
+		metrics:   requestMetrics{started: time.Now()},
 	}, nil
 }
 
+func (s *Server) authorized(r *http.Request) bool {
+	headers := r.Header.Values("Authorization")
+	parts := strings.Fields(r.Header.Get("Authorization"))
+	if len(headers) != 1 || len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return false
+	}
+
+	hash := sha256.Sum256([]byte(parts[1]))
+	return subtle.ConstantTimeCompare(hash[:], s.tokenHash[:]) == 1
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	started := time.Now()
 	idBytes := make([]byte, 16)
 	if _, err := rand.Read(idBytes); err != nil {
 		http.Error(w, "request ID unavailable", http.StatusInternalServerError)
@@ -91,6 +105,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(response)
+		if r.URL.Path == "/api" {
+			s.metrics.record(status, time.Since(started))
+		}
 	}
 
 	// Choose the HTTP endpoint before looking up the caller's requested action.
@@ -103,18 +120,20 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		reply(200, "ok", "", "")
 		return
-	case "/api":
+	case "/api", "/admin/metrics":
 		// Authenticate before parsing the caller's JSON or invoking a function.
-		headers := r.Header.Values("Authorization")
-		parts := strings.Fields(r.Header.Get("Authorization"))
-		var candidate string
-		if len(headers) == 1 && len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
-			candidate = parts[1]
-		}
-		hash := sha256.Sum256([]byte(candidate))
-		if candidate == "" || subtle.ConstantTimeCompare(hash[:], s.tokenHash[:]) != 1 {
+		if !s.authorized(r) {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="gofm"`)
 			reply(401, nil, "unauthorized", "a valid bearer token is required")
+			return
+		}
+		if r.URL.Path == "/admin/metrics" {
+			if r.Method != http.MethodGet {
+				w.Header().Set("Allow", "GET")
+				reply(405, nil, "method_not_allowed", "use GET")
+				return
+			}
+			reply(200, s.metrics.snapshot(), "", "")
 			return
 		}
 	default:

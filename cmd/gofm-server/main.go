@@ -20,6 +20,7 @@ import (
 
 func main() {
 	path := flag.String("config", "config.local.json", "private JSON configuration file")
+	dashboard := flag.String("dashboard", "", "optional directory containing the built admin dashboard")
 	init := flag.Bool("init-config", false, "create a private configuration with a random token, then exit")
 	flag.Parse()
 
@@ -31,7 +32,7 @@ func main() {
 		log.Print("Private config created. Read its token locally; existing files are never overwritten.")
 		return
 	}
-	if err := run(*path); err != nil {
+	if err := run(*path, *dashboard); err != nil {
 		log.Printf("server: %v", err)
 		os.Exit(1)
 	}
@@ -61,7 +62,7 @@ func initConfig(path string) error {
 	return errors.Join(writeErr, closeErr)
 }
 
-func run(path string) error {
+func run(path string, dashboard string) error {
 	config, err := api.LoadConfig(path)
 	if err != nil {
 		return err
@@ -70,9 +71,15 @@ func run(path string) error {
 	if err != nil {
 		return err
 	}
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	if dashboard != "" {
+		files := http.FileServer(http.Dir(dashboard))
+		mux.Handle("/admin/dashboard/", http.StripPrefix("/admin/dashboard/", files))
+	}
 	srv := &http.Server{
 		Addr:              config.Address,
-		Handler:           handler,
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
