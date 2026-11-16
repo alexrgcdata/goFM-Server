@@ -18,3 +18,11 @@ The dashboard directory should contain only the generated static files.
 
 Start with `internal/api/metrics.go` for the Go counters and
 `web/admin/main.tsx` for the React screen.
+
+## PostgreSQL example
+
+Run `psql -d workshop -f examples/workshop-jobs.sql` to create three fictional
+jobs. Set `WORKSHOP_POSTGRES_DSN` before starting Go to enable `demo.jobs`.
+Workshop uses the local PostgreSQL socket and the Linux `deploy` account.
+Click **Read sample jobs from PostgreSQL** to send `demo.jobs` with an empty
+`params` array. The fixed SELECT lives in `internal/api/demo_jobs.go`.

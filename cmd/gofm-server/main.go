@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"gofm-server/internal/api"
 )
 
@@ -67,7 +69,7 @@ func run(path string, dashboard string) error {
 	if err != nil {
 		return err
 	}
-	handler, err := api.New(config)
+	handler, err := buildHandler(config)
 	if err != nil {
 		return err
 	}
@@ -111,4 +113,20 @@ func run(path string, dashboard string) error {
 	// requests to drain before allowing the process to exit.
 	<-shutdownDone
 	return nil
+}
+
+func buildHandler(config api.Config) (*api.Server, error) {
+	dsn := os.Getenv("WORKSHOP_POSTGRES_DSN")
+	if dsn == "" {
+		return api.New(config)
+	}
+
+	database, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, errors.New("invalid Workshop PostgreSQL connection settings")
+	}
+	// Keep the pool small on the Workshop VPS.
+	database.SetMaxOpenConns(2)
+	database.SetMaxIdleConns(1)
+	return api.NewWithDemoJobs(config, database)
 }

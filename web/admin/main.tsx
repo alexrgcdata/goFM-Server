@@ -86,7 +86,7 @@ function App() {
         const sample = await fetch('/api', {
           method: 'POST',
           headers: { Authorization: authorization, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'sample', params: [] }),
+          body: JSON.stringify({ action: 'demo.jobs', params: [] }),
           signal: AbortSignal.timeout(8000),
         })
         if (!sample.ok) {
@@ -143,11 +143,11 @@ function App() {
           }} required disabled={loading} />
         <button disabled={loading}>{loading ? 'Loading…' : 'Refresh metrics'}</button>
         <button type="button" disabled={loading || !token.trim()} onClick={() => void refresh(true)}>
-          Run sample action
+          Read sample jobs from PostgreSQL
         </button>
       </form>
       <p role="status">{message}</p>
-      {sampleResult && <><h2>Sample response</h2><pre>{sampleResult}</pre></>}
+      {sampleResult && <><h2>PostgreSQL response</h2><pre>{sampleResult}</pre></>}
       {metrics && (
         <dl>
           <div><dt>Uptime</dt><dd>{metrics.uptime_seconds} s</dd></div>
